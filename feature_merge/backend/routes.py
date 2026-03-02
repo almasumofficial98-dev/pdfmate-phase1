@@ -5,7 +5,8 @@ from .service import merge_by_page
 merge_bp = Blueprint("merge", __name__)
 
 
-@merge_bp.route("/merge/", methods=["POST"])
+# 🌟 VERCEL ERROR FIX: Added the '/api/' prefix so the React router can successfully forward requests here
+@merge_bp.route("/api/merge/", methods=["POST"])
 def merge():
     files = request.files.getlist("files")
     order_json = request.form.get("order")

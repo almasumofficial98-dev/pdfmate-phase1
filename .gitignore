@@ -4,3 +4,4 @@ temp_uploads/
 .env
 node_modules/
 dist/
+.vercel

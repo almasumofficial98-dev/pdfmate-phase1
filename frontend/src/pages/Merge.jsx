@@ -95,7 +95,6 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview, isDele
     zIndex: isDragging ? 50 : 1,
   };
 
-  // Determine which entry/exit animation to use
   const isCopy = page.id.includes("-copy-");
   const animationClass = isDeleting
     ? "animate-[shatterGlass_0.6s_ease-in_forwards]"
@@ -113,7 +112,6 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview, isDele
         isDragging ? "shadow-2xl scale-105 cursor-grabbing ring-4 ring-blue-500 border-transparent" : "hover:shadow-xl hover:border-slate-300 cursor-grab border-slate-200"
       } ${isNewFile && !isDragging ? "ml-12" : "ml-0"} ${isSelected && !isDragging ? "ring-2 ring-blue-500 bg-blue-50" : ""}`}
     >
-      {/* 🌟 Dynamic Animation Wrapper */}
       <div className={`w-full h-full flex flex-col ${animationClass}`}>
         
         {isNewFile && !isDragging && (
@@ -189,10 +187,7 @@ export default function Merge() {
   const [slideDirection, setSlideDirection] = useState('initial'); 
   const [outputFileName, setOutputFileName] = useState("");
 
-  // Tracking pending deletions to trigger shatter animation
   const [deletingIds, setDeletingIds] = useState([]);
-  
-  // Tracking successful download to trigger fly-to-corner animation
   const [saveAnimation, setSaveAnimation] = useState(false);
 
   const { pages, selectedIds } = state.present;
@@ -297,11 +292,9 @@ export default function Merge() {
     easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
   };
 
-  // Intercept the Action to handle the Shatter Delete delay
   const handleAction = (type, payload) => {
     if (type === "DELETE") {
       setDeletingIds(prev => [...prev, ...payload]);
-      // Wait for the 600ms CSS animation to finish before removing from React state
       setTimeout(() => {
         dispatch({ type, payload });
         setDeletingIds(prev => prev.filter(id => !payload.includes(id)));
@@ -324,12 +317,18 @@ export default function Merge() {
 
     try {
       const response = await fetch("/api/merge/", { method: "POST", body: formData });
+      
+      // 🌟 VERCEL ERROR FIX: Throw an error if backend fails instead of downloading a corrupted file
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error (${response.status}): ${errorText}`);
+      }
+
       setProgress(80);
       const blob = await response.blob();
       const a = document.createElement("a");
       a.href = window.URL.createObjectURL(blob);
       
-      // FIXED: Respects user-edited file name for BOTH merge all and merge selected
       let finalDownloadName = outputFileName.trim() ? outputFileName.trim() : "merged_document";
       if (!finalDownloadName.toLowerCase().endsWith('.pdf')) finalDownloadName += ".pdf";
       a.download = finalDownloadName;
@@ -337,17 +336,16 @@ export default function Merge() {
       a.click();
       setProgress(100);
 
-      // Trigger the success fly-away animation
       setTimeout(() => {
         setIsMerging(false);
         setProgress(0);
         setSaveAnimation(true);
-        setTimeout(() => setSaveAnimation(false), 2000); // clear animation state
+        setTimeout(() => setSaveAnimation(false), 2000); 
       }, 500);
 
     } catch (error) {
       console.error("Merge failed", error);
-      alert("Failed to merge documents.");
+      alert(error.message || "Failed to merge documents.");
       setIsMerging(false);
       setProgress(0);
     }
@@ -356,7 +354,6 @@ export default function Merge() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col items-center py-12 px-6 relative overflow-hidden">
       
-      {/* 🌟 Global Custom Animation Dictionary */}
       <style>{`
         @keyframes flyInFromTopRight {
           0% { transform: translate(50vw, -50vh) scale(0.2) rotate(45deg); opacity: 0; }
@@ -385,7 +382,6 @@ export default function Merge() {
           100% { transform: scale(1); opacity: 1; }
         }
         
-        /* 🌟 NEW: Popcorn Duplicate Animation */
         @keyframes popcorn {
           0% { transform: scale(0.6) translateY(30px); opacity: 0; }
           40% { transform: scale(1.15) translateY(-40px) rotate(8deg); opacity: 1; }
@@ -394,7 +390,6 @@ export default function Merge() {
           100% { transform: scale(1) translateY(0) rotate(0); opacity: 1; }
         }
 
-        /* 🌟 NEW: Shattered Glass Delete Animation */
         @keyframes shatterGlass {
           0% { transform: scale(1) rotate(0deg); filter: brightness(1) contrast(1); opacity: 1; }
           20% { transform: scale(1.05) skewX(5deg) skewY(-5deg); filter: brightness(1.5) contrast(2) drop-shadow(0 0 15px rgba(255,255,255,0.9)); opacity: 1; }
@@ -402,7 +397,6 @@ export default function Merge() {
           100% { transform: scale(0.3) rotate(60deg) translateY(250px); filter: blur(5px); opacity: 0; }
         }
 
-        /* 🌟 NEW: Save/Fly to Top Right Animation */
         @keyframes flyToTopRight {
           0% { top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1); opacity: 0; }
           15% { top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1.3) rotate(-5deg); opacity: 1; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.2)); }
@@ -411,7 +405,6 @@ export default function Merge() {
         }
       `}</style>
 
-      {/* 🌟 NEW: Success Save Animation Overlay */}
       {saveAnimation && (
         <div className="fixed inset-0 pointer-events-none z-[200]">
           <div className="absolute animate-[flyToTopRight_1.5s_cubic-bezier(0.55,0.085,0.68,0.53)_forwards] flex flex-col items-center">

@@ -1,11 +1,11 @@
 import os
 import json
+import tempfile
 from uuid import uuid4
 from pypdf import PdfReader, PdfWriter
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "temp_uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# 🌟 VERCEL ERROR FIX: Vercel instances are completely read-only except for the '/tmp' directory.
+UPLOAD_FOLDER = tempfile.gettempdir()
 
 
 def save_uploaded_files(files):
