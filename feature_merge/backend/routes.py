@@ -9,6 +9,10 @@ merge_bp = Blueprint("merge", __name__)
 def merge():
     files = request.files.getlist("files")
     order_json = request.form.get("order")
+    
+    # Layer 4 Data Extraction
+    metadata_json = request.form.get("metadata")
+    compress = request.form.get("compress") == "true"
 
     if not files:
         return jsonify({"error": "No files uploaded."}), 400
@@ -17,7 +21,8 @@ def merge():
         return jsonify({"error": "No page order provided."}), 400
 
     try:
-        output_path = merge_by_page(files, order_json)
+        # Pass the new compression and metadata variables to the service
+        output_path = merge_by_page(files, order_json, metadata_json, compress)
 
         if not os.path.exists(output_path):
             return jsonify({"error": "Merged file not created."}), 500
