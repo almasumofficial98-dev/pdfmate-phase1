@@ -1,14 +1,6 @@
-import sys
-import os
-
-# 🌟 VERCEL FIX: Force Python to look in the root folder for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from flask import Flask
 from flask_cors import CORS
-
 from feature_merge.backend.routes import merge_bp
-
 
 def create_app():
     app = Flask(__name__)
@@ -21,7 +13,6 @@ def create_app():
         return {"status": "Phase 1 Structural API Running"}
 
     return app
-
 
 app = create_app()
 

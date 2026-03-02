@@ -18,3 +18,4 @@ __pycache__/
 temp_uploads/
 feature_merge/backend/temp_uploads/
 *.pdf
+.vercel
