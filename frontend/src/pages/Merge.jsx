@@ -62,6 +62,7 @@ function editorReducer(state, action) {
       state.present.pages.forEach(p => {
         newPages.push(p);
         if (action.payload.includes(p.id)) {
+          // The "-copy-" string is used to trigger the popcorn animation
           newPages.push({ ...p, id: `${p.id}-copy-${Math.random().toString(36).substring(2, 9)}` });
         }
       });
@@ -85,7 +86,7 @@ function editorReducer(state, action) {
   }
 }
 
-function SortableItem({ page, onAction, isNewFile, isSelected, onPreview }) {
+function SortableItem({ page, onAction, isNewFile, isSelected, onPreview, isDeleting }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
 
   const style = {
@@ -93,6 +94,14 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview }) {
     transition,
     zIndex: isDragging ? 50 : 1,
   };
+
+  // Determine which entry/exit animation to use
+  const isCopy = page.id.includes("-copy-");
+  const animationClass = isDeleting
+    ? "animate-[shatterGlass_0.6s_ease-in_forwards]"
+    : isCopy
+    ? "animate-[popcorn_0.6s_cubic-bezier(0.175,0.885,0.32,1.275)_forwards]"
+    : "animate-[popIn_0.4s_cubic-bezier(0.175,0.885,0.32,1.275)_forwards]";
 
   return (
     <div
@@ -104,8 +113,8 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview }) {
         isDragging ? "shadow-2xl scale-105 cursor-grabbing ring-4 ring-blue-500 border-transparent" : "hover:shadow-xl hover:border-slate-300 cursor-grab border-slate-200"
       } ${isNewFile && !isDragging ? "ml-12" : "ml-0"} ${isSelected && !isDragging ? "ring-2 ring-blue-500 bg-blue-50" : ""}`}
     >
-      {/* 🌟 Add/Duplicate Pop-in Animation Wrapper */}
-      <div className="w-full h-full flex flex-col animate-[popIn_0.4s_cubic-bezier(0.175,0.885,0.32,1.275)_forwards]">
+      {/* 🌟 Dynamic Animation Wrapper */}
+      <div className={`w-full h-full flex flex-col ${animationClass}`}>
         
         {isNewFile && !isDragging && (
           <div className="absolute -left-11 top-0 bottom-0 flex flex-col items-center justify-center pointer-events-none animate-[smoothFadeIn_0.5s_ease-out]">
@@ -116,7 +125,6 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview }) {
           </div>
         )}
 
-        {/* Checkbox with active pop physics */}
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onAction("TOGGLE_SELECT", page.id); }}
@@ -129,7 +137,6 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview }) {
 
         <div className="relative w-full aspect-[3/4] overflow-hidden rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200 group-hover:border-blue-300 transition-colors">
           
-          {/* Action Buttons with physical active:scale-75 clicks */}
           <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
             <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onAction("DELETE", [page.id]); }} className="w-8 h-8 bg-red-500/80 hover:bg-red-600 text-white flex items-center justify-center rounded-full backdrop-blur-sm transition-all active:scale-75 hover:scale-110 shadow-lg" title="Remove Page">
                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -145,7 +152,6 @@ function SortableItem({ page, onAction, isNewFile, isSelected, onPreview }) {
             </button>
           </div>
 
-          {/* 🌟 Bouncy Rotate Animation! */}
           <img
             src={page.thumbnail}
             alt={`Page ${page.pageNumber}`}
@@ -180,8 +186,14 @@ export default function Merge() {
   const [progress, setProgress] = useState(0);
   
   const [previewPage, setPreviewPage] = useState(null);
-  const [slideDirection, setSlideDirection] = useState('initial'); // Tracking modal animations
+  const [slideDirection, setSlideDirection] = useState('initial'); 
   const [outputFileName, setOutputFileName] = useState("");
+
+  // Tracking pending deletions to trigger shatter animation
+  const [deletingIds, setDeletingIds] = useState([]);
+  
+  // Tracking successful download to trigger fly-to-corner animation
+  const [saveAnimation, setSaveAnimation] = useState(false);
 
   const { pages, selectedIds } = state.present;
   const inputRef = useRef(null);
@@ -204,7 +216,6 @@ export default function Merge() {
     return () => window.removeEventListener("resize", checkScroll);
   }, [pages, editMode]);
 
-  // 🌟 Trigger Next/Prev animations
   const navigatePreview = (direction, e) => {
     if (e) e.stopPropagation();
     const currentIndex = pages.findIndex(p => p.id === previewPage.id);
@@ -286,7 +297,19 @@ export default function Merge() {
     easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
   };
 
-  const handleAction = (type, payload) => dispatch({ type, payload });
+  // Intercept the Action to handle the Shatter Delete delay
+  const handleAction = (type, payload) => {
+    if (type === "DELETE") {
+      setDeletingIds(prev => [...prev, ...payload]);
+      // Wait for the 600ms CSS animation to finish before removing from React state
+      setTimeout(() => {
+        dispatch({ type, payload });
+        setDeletingIds(prev => prev.filter(id => !payload.includes(id)));
+      }, 550);
+    } else {
+      dispatch({ type, payload });
+    }
+  };
 
   const handleMerge = async (mergeOnlySelected = false) => {
     if (pages.length === 0) return;
@@ -300,21 +323,33 @@ export default function Merge() {
     setProgress(40);
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/merge/", { method: "POST", body: formData });
+      const response = await fetch("/api/merge/", { method: "POST", body: formData });
       setProgress(80);
       const blob = await response.blob();
       const a = document.createElement("a");
       a.href = window.URL.createObjectURL(blob);
-      let finalDownloadName = outputFileName.trim() ? outputFileName.trim() : "merged";
+      
+      // FIXED: Respects user-edited file name for BOTH merge all and merge selected
+      let finalDownloadName = outputFileName.trim() ? outputFileName.trim() : "merged_document";
       if (!finalDownloadName.toLowerCase().endsWith('.pdf')) finalDownloadName += ".pdf";
-      a.download = mergeOnlySelected ? "split_selected.pdf" : finalDownloadName;
+      a.download = finalDownloadName;
+      
       a.click();
       setProgress(100);
+
+      // Trigger the success fly-away animation
+      setTimeout(() => {
+        setIsMerging(false);
+        setProgress(0);
+        setSaveAnimation(true);
+        setTimeout(() => setSaveAnimation(false), 2000); // clear animation state
+      }, 500);
+
     } catch (error) {
       console.error("Merge failed", error);
       alert("Failed to merge documents.");
-    } finally {
-      setTimeout(() => { setIsMerging(false); setProgress(0); }, 800);
+      setIsMerging(false);
+      setProgress(0);
     }
   };
 
@@ -349,12 +384,49 @@ export default function Merge() {
           0% { transform: scale(0.9); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
+        
+        /* 🌟 NEW: Popcorn Duplicate Animation */
+        @keyframes popcorn {
+          0% { transform: scale(0.6) translateY(30px); opacity: 0; }
+          40% { transform: scale(1.15) translateY(-40px) rotate(8deg); opacity: 1; }
+          60% { transform: scale(0.9) translateY(10px) rotate(-5deg); }
+          80% { transform: scale(1.05) translateY(-5px) rotate(2deg); }
+          100% { transform: scale(1) translateY(0) rotate(0); opacity: 1; }
+        }
+
+        /* 🌟 NEW: Shattered Glass Delete Animation */
+        @keyframes shatterGlass {
+          0% { transform: scale(1) rotate(0deg); filter: brightness(1) contrast(1); opacity: 1; }
+          20% { transform: scale(1.05) skewX(5deg) skewY(-5deg); filter: brightness(1.5) contrast(2) drop-shadow(0 0 15px rgba(255,255,255,0.9)); opacity: 1; }
+          40% { transform: scale(0.9) skewX(-15deg) skewY(15deg) rotate(15deg) translateY(20px); opacity: 0.8; }
+          100% { transform: scale(0.3) rotate(60deg) translateY(250px); filter: blur(5px); opacity: 0; }
+        }
+
+        /* 🌟 NEW: Save/Fly to Top Right Animation */
+        @keyframes flyToTopRight {
+          0% { top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1); opacity: 0; }
+          15% { top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1.3) rotate(-5deg); opacity: 1; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.2)); }
+          30% { top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1.2) rotate(0deg); opacity: 1; }
+          100% { top: 20px; left: calc(100% - 40px); transform: translate(-50%, -50%) scale(0.1) rotate(20deg); opacity: 0; }
+        }
       `}</style>
 
-      {/* 🌟 Preview Modal with Sliding Transitions */}
+      {/* 🌟 NEW: Success Save Animation Overlay */}
+      {saveAnimation && (
+        <div className="fixed inset-0 pointer-events-none z-[200]">
+          <div className="absolute animate-[flyToTopRight_1.5s_cubic-bezier(0.55,0.085,0.68,0.53)_forwards] flex flex-col items-center">
+            <div className="bg-white p-4 rounded-2xl shadow-2xl border-2 border-blue-500">
+              <svg className="w-24 h-24 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-5H8l4-4 4 4h-3v5h-2z"/></svg>
+            </div>
+            <span className="bg-emerald-500 text-white px-6 py-2 rounded-full mt-4 font-extrabold text-lg shadow-xl uppercase tracking-widest">
+              Saved!
+            </span>
+          </div>
+        </div>
+      )}
+
       {previewPage && (
         <div className="fixed inset-0 bg-slate-900/95 z-[100] flex flex-col items-center justify-center p-4 sm:p-8 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]" onClick={() => setPreviewPage(null)}>
-          
           <div className="flex justify-between w-full max-w-6xl mb-4 text-white z-10 px-4 sm:px-12 animate-[smoothFadeIn_0.3s_ease-out]" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-bold text-xl">{previewPage.fileName} <span className="text-slate-400">| Page {previewPage.pageNumber}</span></h3>
             <button className="text-white hover:text-red-400 font-bold flex items-center gap-2 transition-all active:scale-75" onClick={() => setPreviewPage(null)}>
@@ -367,7 +439,6 @@ export default function Merge() {
               <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
             </button>
 
-            {/* The Image Wrapper Handles the Slide Animations based on the Key changing */}
             <div key={previewPage.id} className={`flex items-center justify-center h-full w-full ${slideDirection === 'next' ? 'animate-[slideInRight_0.3s_ease-out]' : slideDirection === 'prev' ? 'animate-[slideInLeft_0.3s_ease-out]' : 'animate-[fadeZoom_0.3s_ease-out]'}`}>
               <img 
                 src={previewPage.thumbnail} 
@@ -471,7 +542,7 @@ export default function Merge() {
               <div className="flex gap-3 w-full xl:w-auto mt-4 xl:mt-0 items-center">
                 {selectedIds.length > 0 && (
                   <button onClick={() => handleMerge(true)} className="px-5 py-3 font-semibold rounded-xl transition-all active:scale-95 flex items-center gap-2 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 animate-[fadeZoom_0.2s_ease-out]">
-                     Export Selected ({selectedIds.length})
+                      Export Selected ({selectedIds.length})
                   </button>
                 )}
                 <div className="relative flex items-center">
@@ -503,7 +574,15 @@ export default function Merge() {
                   <DndContext collisionDetection={closestCenter} onDragStart={(e) => setActiveId(e.active.id)} onDragEnd={handleDragEnd} autoScroll={true}>
                     <SortableContext items={pages.map(p => p.id)} strategy={horizontalListSortingStrategy}>
                       {pages.map((page, index) => (
-                        <SortableItem key={page.id} page={page} onAction={handleAction} isNewFile={index === 0 || pages[index - 1].fileName !== page.fileName} isSelected={selectedIds.includes(page.id)} onPreview={(page) => { setSlideDirection('initial'); setPreviewPage(page); }} />
+                        <SortableItem 
+                          key={page.id} 
+                          page={page} 
+                          onAction={handleAction} 
+                          isNewFile={index === 0 || pages[index - 1].fileName !== page.fileName} 
+                          isSelected={selectedIds.includes(page.id)} 
+                          isDeleting={deletingIds.includes(page.id)}
+                          onPreview={(page) => { setSlideDirection('initial'); setPreviewPage(page); }} 
+                        />
                       ))}
                     </SortableContext>
 

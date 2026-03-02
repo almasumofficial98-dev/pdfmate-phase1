@@ -1,7 +1,7 @@
 import os
 import json
 from uuid import uuid4
-from PyPDF2 import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "temp_uploads")
@@ -61,6 +61,7 @@ def merge_by_page(files, order_json, metadata_json=None, compress=False):
             page = reader.pages[page_number - 1]
             
             if rotation_angle != 0:
+                # Using pypdf's transfer_rotation method or simple rotation
                 page.rotate(rotation_angle)
 
             writer.add_page(page)
