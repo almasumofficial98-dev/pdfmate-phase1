@@ -1,7 +1,20 @@
-__pycache__/
-temp_uploads/
-*.pyc
-.env
+# Node & Frontend
 node_modules/
-dist/
-.vercel
+frontend/dist/
+frontend/.vite/
+
+# Python & Backend
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Vercel & Environment
+.vercel/
+.env
+
+# Uploads & Temp files
+temp_uploads/
+feature_merge/backend/temp_uploads/
+*.pdf
