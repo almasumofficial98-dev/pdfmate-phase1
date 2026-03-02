@@ -18,6 +18,10 @@
       "destination": "/app.py"
     },
     {
+      "source": "/merge-pdfs",
+      "destination": "/frontend/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/frontend/$1"
     }
