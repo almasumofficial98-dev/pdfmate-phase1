@@ -1,13 +1,6 @@
-# Virtual environment
-backend_app/.venv/
-
-# Python cache
 __pycache__/
-*.pyc
-
-# Temp upload folder
 temp_uploads/
-
-# OS files
-.DS_Store
-Thumbs.db
+*.pyc
+.env
+node_modules/
+dist/
