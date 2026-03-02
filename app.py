@@ -6,7 +6,7 @@ def create_app():
     app = Flask(__name__)
     CORS(app)
 
-    app.register_blueprint(merge_bp)
+    app.register_blueprint(merge_bp, url_prefix="/merge")
 
     @app.route("/")
     def health():
